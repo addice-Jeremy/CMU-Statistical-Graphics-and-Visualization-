@@ -1,3 +1,3 @@
-CMU Statistical Graphics and Visualization
+# CMU Statistical Graphics and Visualization
 
 
