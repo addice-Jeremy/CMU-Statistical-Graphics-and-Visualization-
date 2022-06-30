@@ -1,0 +1,848 @@
+---
+title: "36-315 Final Project - Why Workers Quit"
+author: 
+- "Jeremy Li, Samuel De Lucia"
+date: 'June 24, 2022'
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+
+---
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+###########################
+# STYLE EDITS: IGNORE THIS
+###########################
+
+knitr::opts_chunk$set(message = FALSE, # markdown won't knit messages
+                      warning = FALSE, # markdown won't knit warnings
+                      echo = TRUE)     # code will be included
+
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+
+###########################
+# LIBRARIES
+###########################
+
+library(tidyverse)
+library(scales)
+library(lubridate)
+library(gridExtra)
+library(ggcorrplot)
+library(ggthemes)
+library(ggmosaic)
+library(ggpubr)
+library(ggrepel)
+
+options(dplyr.summarise.inform = FALSE)
+
+```
+
+# Data Overview 
+
+##  Introduction
+
+Employees are the backbone of any organization. The success of an organization is heavily dependent on committed employees who are motivated and productive to carry out a company's goals and objectives. Thus, employee attrition, the rate at which employees leave their job, hurts the growth and performance of an organization in terms of financial profit, productivity, and time. However, attrition is an inevitable part of any business. There will come a time when an employees wants to leave a company, which can happen for many reasons. For instance, employees might be seeking for better opportunities, mentally illed, working excessive hours, working in a toxic atmosphere or under bad management, etc. But when attrition reaches a particular threshold, it becomes a concern to be addressed as it may be reflecting a deep problem with the company culture. Attrition is particularly concerning when the attrition rate is high, indicating that employees are turning over pretty quickly, or when early attrition rate is high, indicating new joiners leave the company within the first few years of employment. Therefore, it is important to ask questions, find out why people leaving, and understand what is influencing attrition rate within an organization.  
+
+The most important question to ask is what factors are contributing to more employee attrition? Thus, by understanding these reasons for employee attrition, a company can take the correct measures to retain their employees. To explore these correlations, we used an IBM Employee Attrition dataset to explore and visualize interesting and significant factors that lead to higher employee attrition. 
+
+## Data Description
+
+For the convenience of working with the data, we represented some variables such as Attrition and OverTime values with their respective binary values (from Yes and No to 1 and 0, respectively)
+
+```{r echo=FALSE, warning=FALSE}
+
+options(show_col_types = FALSE)
+
+employee_attrition <- read_csv('IBM_Employee_Attrition.csv')
+
+employee_attrition <- employee_attrition %>%
+  mutate(Attrition = ifelse(Attrition == 'Yes', 1, 0),
+         OverTime = ifelse(OverTime == 'Yes', 1, 0))
+
+```
+
+For the project, we used an IBM employee data set hosted on Kaggle that contains various personal and professional information about an employee (i.e. Attrition, Age, Monthly Income, etc). The [dataset](https://www.kaggle.com/datasets/pavansubhasht/ibm-hr-analytics-attrition-dataset) was last updated in 2017 and does not have any missing data, which makes it easier to work with. In total, there are 1470 observations (rows) and each observation represents an employee. There are 35 variables (columns) and below are the variables contained in the dataset: 
+
+* `Age`: Employee age 
+* `Attrition`: if the employee leaves the job
+* `BusinessTravel`: The frequency of job travels
+* `DailyRate`: Billing cost for employee's services for a single day
+* `Department`: Employee work department
+* `DistanceFromHome`: Distance traveled to work from home
+* `Education`: Employee education level (1 = Below College, 2 = College, 3 = Bachelor, 4 = Master, 5 = Doctor)
+* `EducationField`: Employee education field
+* `EmployeeCount`: Employee Count (Constant)
+* `EmployeeNumber`: Employee ID
+* `EnvironmentSatisfaction`: Numerical value for environment satisfaction (1 = Low, 2 = Medium, 3 = High, 4 = Very High)
+* `Gender`: Employee gender
+* `HourlyRate`: The amount of money that employee earns for every hour worked
+* `JobInvolvement`: Numerical value for job involvement (1 = Low, 2 = Medium, 3 = High, 4 = Very High)
+* `JobLevel`: Numerical value for job level
+* `JobRole`: Employee job position
+* `JobSatisfaction`: Numerical value for job satisfaction (1 = Low, 2 = Medium, 3 = High, 4 = Very High)
+* `MaritalStatus`: Employee marital status
+* `MonthlyIncome`: The amount of money that employee earns in one month, before taxes or deductions
+* `MonthlyRate`: Billing cost for employee's services for a month
+* `NumCompaniesWorked`: Number of companies worked at 
+* `Over18`: if employee is over 18 years old
+* `OverTime`: if employee works overtime
+* `PercentSalaryHike`: Percent increase in salary 
+* `PerformanceRating`: Numerical value for performance rating (1 = Low, 2 = Good, 3 = Excellent, 4 = Outstanding)
+* `RelationshipSatisfaction`: Numerical value for relationship satisfaction (1 = Low, 2 = Medium, 3 = High, 4 = Very High)
+* `StandardHours`: Hours employee spent working (Constant)
+* `StockOptionsLevel`: Numerical value for stock options
+* `TotalWorkingYears`: Total number of years employee worked
+* `TrainingTimesLastYear`: Hours employee spent on training last year
+* `WorkLifeBalance`: Numerical value for work life balance (1 = Bad,  2 = Good,  3 = Better,  4 = Best)
+* `YearsAtCompany`: Number of years employee worked at company
+* `YearsInCurrentRole`: Number of years employee worked as their current job role
+* `YearsSinceLastPromotion`: Number of years since last promotion
+* `YearsWithCurrentManager`: Number of years employee worked with current manager
+
+See a few example rows of the dataset below: 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+head(employee_attrition)
+
+```
+
+Before we look at multivariate relationships, we need to apply Exploratory Data Analysis (EDA) on the dataset to help us find interesting relations between the variables. The primary goal of EDA is maximize the insight into the data set and into its underlying structure, while extracting important specifics from the data set, By investigating the data set and summarizing its main characteristics, we can spot anomalies and outliers to formalize our research questions. 
+
+## Exploratory Data Analysis {.tabset}
+
+### EDA 1
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+# Attrition % and # (EDA)
+
+plot1 <- employee_attrition %>%
+  add_count() %>%
+  group_by(Attrition, n) %>%
+  summarize(count = n()) %>%
+  mutate(percent = (count / n) * 100,
+         Attrition = ifelse(Attrition == 1, 'Yes', 'No')) %>%
+  ggplot(aes(x = as.character(Attrition), y = percent, fill = as.character(Attrition))) +
+  geom_col() +
+  geom_text(aes(y = 0.05, label= paste0(round(percent, 0), '%')), 
+            hjust = -0.5, size = 3.5, fontface = "bold") +
+  scale_fill_manual(values = c("lightgreen", "tomato2")) + 
+  scale_y_continuous(breaks = seq(0, 100, 20)) + 
+  coord_flip() + 
+  theme(legend.position = 'None', 
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major.x = element_line(color = "grey90", size = 0.5)) + 
+  labs(x = 'Employee Attrition', 
+       y = 'Percentage',
+       title = 'Employee Attrition (%)')
+
+plot2 <- employee_attrition %>%
+  add_count() %>%
+  group_by(Attrition, n) %>%
+  summarize(count = n()) %>%
+  mutate(Attrition = ifelse(Attrition == 1, 'Yes', 'No')) %>%
+  ggplot(aes(x = as.character(Attrition), y = count, fill = as.character(Attrition))) +
+  geom_col() +
+  geom_text(aes(y= 0.1, label= count, group = Attrition),
+            hjust = 0.5, vjust = -2, size = 3.5, fontface = "bold") +
+  scale_fill_manual(values = c("lightgreen", "tomato2")) +
+  theme(legend.position = 'None',
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5)) +
+  labs(x = 'Employee Attrition',
+       y = 'Amount',
+       title = 'Employee Attrition (Amount)')
+
+grid.arrange(plot1, plot2, ncol = 2, widths = c(25, 25))
+```
+
+### EDA 2
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+# Attrition by Overtime Status EDA
+
+plot3 <- employee_attrition %>%
+  filter(Attrition == 1) %>% 
+  group_by(Attrition) %>%
+  add_count() %>%
+  group_by(Attrition, OverTime, n) %>%
+  summarize(count = n()) %>%
+  mutate(percent = round(count * 100 / n), 
+         label = paste0(percent, '%'),
+         OverTime = ifelse(OverTime == 1, 'Yes', 'No')) %>%
+  ggplot(aes(x = '', y = percent, fill = as.character(OverTime))) +
+  geom_bar(width = 1, stat = "identity") +
+  geom_label(aes(label = label), position = position_stack(vjust = 0.5), show.legend = FALSE) +
+  coord_polar('y', start = 0) +
+  scale_fill_manual(values = c("#faa095", "#9fd9cb")) + 
+  theme(panel.grid = element_blank(),
+        plot.title = element_text(hjust = 0.25),
+        panel.background = element_blank(),
+        axis.ticks = element_blank()) + 
+  labs(title = 'Level of Attrition by Overtime Status (by %)', 
+       x = '', y = '', fill = 'OverTime')
+  
+plot4 <- employee_attrition %>% 
+  filter(Attrition == 1) %>%
+  group_by(OverTime) %>%
+  summarize(count = n()) %>%
+  mutate(OverTime = ifelse(OverTime == 1, 'Yes', 'No')) %>%
+  ggplot(aes(x = as.character(OverTime), y = count, fill = as.character(OverTime))) + 
+  geom_col(position = 'dodge') + 
+  geom_label(aes(label = count), show.legend = FALSE) + 
+  scale_fill_manual(values = c("#faa095", "#9fd9cb")) + 
+  theme(panel.background = element_blank(),
+        plot.title = element_text(hjust = 0.5),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        panel.grid.minor.y = element_line(color = 'grey90', size = 0.5),
+        axis.ticks = element_blank()) +
+  labs(title = 'Level of Attrition by Overtime Status (by #)', 
+       x = 'Overtime Status', y = 'Number of Employees', fill = 'OverTime')
+
+grid.arrange(plot3, plot4, ncol = 2, widths = c(25, 25))
+
+```
+
+### EDA 3
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+ring_size <- 4
+
+m1 <- employee_attrition %>%
+  filter(Attrition == 1) %>%
+  add_count() %>%
+  mutate(Generation = ifelse(Age >= 7 & Age <= 22, 'Generation Z',
+                      ifelse(Age >= 23 & Age <= 38, 'Millennials',
+                      ifelse(Age <= 39 & Age <= 54, 'Generation X','Boomers')))) %>%
+  group_by(Generation, n) %>%
+  summarize(count = n()) %>%
+  mutate(percent = round(100 * count / n),
+         label = case_when(Generation == 'Millennials' ~ paste0(percent, '%'))) %>%
+  mutate(MillenialsGeneration = ifelse(Generation == 'Millennials', 'Yes', 'No')) %>%
+  ggplot(aes(x = ring_size, y = percent, fill = as.character(MillenialsGeneration))) + 
+  geom_bar(width = 1, stat = "identity") +
+  geom_label(aes(label = label), position = position_stack(vjust = 0.5), show.legend = FALSE) + 
+  coord_polar(theta = 'y') + 
+  xlim(c(1, ring_size + 0.5)) + 
+  scale_fill_manual(values = c('grey90', '#a1d17b')) + 
+  theme_tufte(ticks = FALSE) + 
+  theme(axis.text = element_blank()) + 
+  labs(title = 'Millennials (Current Ages: 23-38)', subtitle = "Of employees who left, 62% are Millennials", 
+       x = '', y = '', fill = 'Millennials')
+
+m2 <- employee_attrition %>%
+  filter(Attrition == 1) %>%
+  add_count()  %>%
+  mutate(Generation = ifelse(Age >= 7 & Age <= 22, 'Generation Z',
+                      ifelse(Age >= 23 & Age <= 38, 'Millennials',
+                      ifelse(Age <= 39 & Age <= 54, 'Generation X','Boomers')))) %>%
+  group_by(Generation, n) %>%
+  summarize(count = n()) %>%
+  mutate(percent = round(100 * count / n),
+         label = case_when(Generation == 'Boomers' ~ paste0(percent, '%'))) %>%
+  mutate(BoomersGeneration = ifelse(Generation == 'Boomers', 'Yes', 'No')) %>%
+  ggplot(aes(x = ring_size, y = percent, fill = as.character(BoomersGeneration))) + 
+  geom_bar(width = 1, stat = "identity") +
+  geom_label(aes(label = label), position = position_stack(vjust = 0.5), show.legend = FALSE) + 
+  coord_polar(theta = 'y') + 
+  xlim(c(1, ring_size + 0.5)) + 
+  scale_fill_manual(values = c('grey90', '#a1d17b')) + 
+  theme_tufte(ticks = FALSE) + 
+  theme(axis.text = element_blank()) + 
+  labs(title = 'Boomers (Current Ages: 55-73)', subtitle = "Of employees who left, 24% are Boomers", 
+       x = '', y = '', fill = 'Boomers')
+
+m3 <- employee_attrition %>%
+  filter(Attrition == 1) %>%
+  add_count()  %>%
+  mutate(Generation = ifelse(Age >= 7 & Age <= 22, 'Generation Z',
+                      ifelse(Age >= 23 & Age <= 38, 'Millennials',
+                      ifelse(Age <= 39 & Age <= 54, 'Generation X','Boomers')))) %>%
+  group_by(Generation, n) %>%
+  summarize(count = n()) %>%
+  mutate(percent = round(100 * count / n),
+         label = case_when(Generation == 'Generation Z' ~ paste0(percent, '%'))) %>%
+  mutate(GenerationZGeneration = ifelse(Generation == 'Generation Z', 'Yes', 'No')) %>%
+  ggplot(aes(x = ring_size, y = percent, fill = as.character(GenerationZGeneration))) + 
+  geom_bar(width = 1, stat = "identity") +
+  geom_label(aes(label = label), position = position_stack(vjust = 0.5), show.legend = FALSE) + 
+  coord_polar(theta = 'y') + 
+  xlim(c(1, ring_size + 0.5)) + 
+  scale_fill_manual(values = c('grey90', '#a1d17b')) + 
+  theme_tufte(ticks = FALSE) + 
+  theme(axis.text = element_blank()) + 
+  labs(title = 'Generation Z (Current Ages: 7-22)', subtitle = 'Of employees who left, 11% are Generation Z', 
+       x = '', y = '', fill = 'Generation Z')
+
+
+m4 <- employee_attrition %>%
+  filter(Attrition == 1) %>%
+  add_count()  %>%
+  mutate(Generation = ifelse(Age >= 7 & Age <= 22, 'Generation Z',
+                      ifelse(Age >= 23 & Age <= 38, 'Millennials',
+                      ifelse(Age <= 39 & Age <= 54, 'Generation X','Boomers')))) %>%
+  group_by(Generation, n) %>%
+  summarize(count = n()) %>%
+  mutate(percent = round(100 * count / n),
+         label = case_when(Generation == 'Generation X' ~ paste0(percent, '%'))) %>%
+  mutate(GenerationXGeneration = ifelse(Generation == 'Generation X', 'Yes', 'No')) %>%
+  ggplot(aes(x = ring_size, y = percent, fill = as.character(GenerationXGeneration))) + 
+  geom_bar(width = 1, stat = "identity") +
+  geom_label(aes(label = label), position = position_stack(vjust = 0.5), show.legend = FALSE) + 
+  coord_polar(theta = 'y') + 
+  xlim(c(1, ring_size + 0.5)) + 
+  scale_fill_manual(values = c('grey90', '#a1d17b')) + 
+  theme_tufte(ticks = FALSE) + 
+  theme(axis.text = element_blank()) + 
+  labs(title = 'Generation X (Current Ages: 39-54)', subtitle = "Of employees who left, 3% are Generation X", 
+       x = '', y = '', fill = 'Generation X')
+
+grid.arrange(m3, m1, m4, m2, ncol = 2)
+```
+
+### EDA 4
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+plot5 <- employee_attrition %>%
+  mutate(YearsAtCompany = case_when(YearsAtCompany >= 0 & YearsAtCompany <= 3 ~ '0-3',
+                                    YearsAtCompany >= 4 & YearsAtCompany <= 6 ~ '4-6',
+                                    YearsAtCompany >= 7 & YearsAtCompany <= 10 ~ '7-10',
+                                    YearsAtCompany >= 11 ~ '11+')) %>% 
+  filter(Attrition == 1) %>%
+  group_by(YearsAtCompany) %>%
+  summarize(count = n()) %>%
+  ggplot(aes(x = reorder(YearsAtCompany, -count), y = count)) +
+  geom_col(fill = '#4895d1') + 
+  geom_label(aes(label = count), fill = '#4895d1') +
+  theme(panel.background = element_blank(),
+        plot.title = element_text(hjust = 1.1),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        panel.grid.minor.y = element_line(color = 'grey90', size = 0.5),
+        axis.ticks = element_blank()) +
+  labs(title = 'Level of Attrition by # of Years at Company', 
+       x = '# of Years at Company', y = 'Number of Employees')
+
+plot6 <- employee_attrition %>%
+  filter(Attrition == 1) %>%
+  add_count() %>%
+  group_by(MaritalStatus, n) %>%
+  summarize(count = n()) %>%
+  mutate(percent = round(100 * count / n),
+         label = paste0(percent, '%')) %>%
+  ggplot(aes(x = '', y = percent, fill = MaritalStatus)) +
+  geom_bar(width = 1, stat = 'identity') +
+  geom_label(aes(label = label), position = position_stack(vjust = 0.5), show.legend = FALSE) +
+  coord_polar('y', start = 0) +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        plot.title = element_text(hjust = 0.2),
+        axis.ticks = element_blank()) +
+  labs(title = 'Level of Attrition by Marital Status (by %)',
+       x = '', y = '', fill = 'Marital Status') + 
+  guides(fill = guide_legend(reverse = TRUE))
+
+grid.arrange(plot6, plot5, ncol = 2, widths = c(25, 25))
+```
+
+# Research Questions 
+
+In this project, we ask the following questions: 
+
+1. **What do the average ratings of job satisfaction look like at IBM?**
+- The conditional distribution of job satisfaction given overtime
+- The conditional distribution of job satisfaction given overtime by attrition rate
+- The conditional distribution of log job satisfaction given department
+- The conditional distribution of log job satisfaction given department on attrition
+- The conditional distribution of log job satisfaction given department on attrition grouped by overtime
+2. **How does working/ not working overtime impact an employee's working experience?**
+- Comparing non-overtime working employees and monthly income by job level & involvement  
+- Comparing number of years from last promotion by job level, overtime, and attrition
+3. **What is the relationship between Age (Generation) and Attrition?**
+- Visualizing generation population and its respective attrition
+- Comparing the difference in job roles age groups
+- Comparing percent & dollar difference in job level and monthly income by age groups
+4. **Which populations have the highest risk of attrition?**
+- Comparing marital status with attrition
+- Comparing years at company with attrition
+
+
+# What are the average ratings of job satisfaction look like at IBM?
+
+First, we examined the relationship between job satisfaction with attrition. This correlation is likely the first that comes to mind when we think about employee attrition. Does the employee like the job/ are they satisfied by their job? What might be factors that impact job satisfaction?
+
+## The conditional distribution of job satisfaction given overtime
+
+Our main goal for exploring job satisfaction is that we would want to find a factor that is lowering people's satisfaction in the work place such that we can correct it in hopes of having a lower attrition rate. The reasoning being that time is money and we wish not to keep wasting time training people or searching for new employees. First, let us setup up to see if there is a connection between job satisfaction and overtime.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+employee_attrition %>%
+  select(JobSatisfaction, OverTime) %>% 
+  mutate(OverTime = ifelse(OverTime == "1", "Yes", "No")) %>%
+  group_by(OverTime) %>%
+  mutate(mean = mean(JobSatisfaction)) %>%
+  ggplot(aes(x = OverTime, y = JobSatisfaction)) + 
+  geom_violin(aes(x = OverTime, y = JobSatisfaction, fill = OverTime), alpha = .1) +
+  geom_hline(mapping = aes(yintercept = mean, color = OverTime)) + 
+  geom_jitter(color="black", size = 0.4, alpha = 0.5) +
+  labs(title = "There is no clear difference between job satisfaction and overtime",
+       x = "OverTime",
+       y = "Job Satisfaction") + 
+  theme(panel.background = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        axis.ticks = element_blank())
+```
+
+As we can see above there is no clear difference as the mean job satisfaction given overtime is so minuscule it does warrant investigation. Even though the above graph does not show it written down in numerical form the means for job satisfaction were 2.74 & 2.75 for having overtime and not, respectively. However, what if it does?
+
+## The conditional distribution of job satisfaction given overtime by attrition rate
+
+Lets see if we can break this down further by understanding the relationship between attrition and job satisfaction of employees who worked overtime.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+employee_attrition %>%
+  select(JobSatisfaction,Attrition, OverTime) %>%
+  mutate(Attrition= ifelse(Attrition == 1, "Yes", "No")) %>%
+  mutate(OverTime = ifelse(OverTime == 1, "Yes", "No")) %>%
+  group_by(Attrition, OverTime) %>%
+  mutate(mean = mean(JobSatisfaction)) %>%
+  ggplot(aes(x = as.character(Attrition), y = JobSatisfaction, fill = OverTime)) +
+  geom_boxplot(aes(x = Attrition, y = JobSatisfaction, group =  interaction(Attrition,OverTime), fill = OverTime),  alpha = .4) + 
+  geom_hline(mapping = aes(yintercept = mean, color = OverTime, linetype = Attrition))+
+  labs(title = "Those Who Do Not Leave Their Job Are More Satisfied By Overtime",
+       subtitle = "Of those who attired, non-overtime employees were less satisfied with the job",
+       x = "Attrition",
+       y = "Job Satisfaction") + 
+  theme(panel.background = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        axis.ticks = element_blank())
+```
+
+As we can see above there is quite a noticeable change from the prior graph. Those who have stayed had the same job satisfaction while those who left had a significantly lower job satisfaction. Now that our suspicion of overtime playing a role in lower job satisfaction, it would be wise of us to explore and see what might cause this lower job satisfaction by attrition.
+
+## The conditional distribution of log job satisfaction given department
+
+To help us understand department, let us only look at the log transform of job satisfaction given department.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+employee_attrition %>%
+  select(Attrition, Education, EducationField, Department, JobRole, JobSatisfaction, JobLevel) %>%
+  group_by(EducationField, JobSatisfaction) %>%
+  summarize(n = log(n())) %>%
+  mutate(total = sum(n)) %>%
+  mutate(average = (n*JobSatisfaction)) %>%
+  mutate(new= sum(average)) %>%
+  mutate(mean = new/total) %>%
+  ggplot(aes(x= JobSatisfaction, y = n, fill = EducationField))+
+  geom_col() +
+  geom_vline(mapping = aes(xintercept = mean)) +
+  facet_wrap(vars(EducationField)) +
+  labs(title = "Marketing and Medical have the lowest job Satisfaction",
+       x="",
+       y="") +
+  theme(legend.position = "none",
+        panel.background = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        panel.grid.minor.y = element_line(color = 'grey90', size = 0.5),
+        axis.ticks = element_blank(),
+        strip.text = element_text(face = "bold", color = "white"),
+        strip.background = element_rect(fill = "black"))
+```
+As we can see above there is no clear highest or lowest job satisfaction. The above graph had to be log transformed as there was a huge skewed in the proportion of people. If you did not log transform, you could see that there out of every department HR had the lowest job satisfaction.  
+
+## The conditional distribution of log job satisfaction given department on attrition
+
+Let us see now the attrition rate by department to see which area might need some reworking.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+employee_attrition %>%
+  select(Attrition, Education, EducationField, Department, JobRole, JobSatisfaction, JobLevel) %>%
+  group_by(Attrition, EducationField, JobSatisfaction) %>%
+  summarize(n = log(n())) %>%
+  mutate(total = sum(n)) %>%
+  mutate(average = (n*JobSatisfaction)) %>%
+  mutate(new= sum(average)) %>%
+  mutate(mean = new/total) %>%
+  mutate(Attrition= ifelse(Attrition == 1, "Yes", "No")) %>%
+  ggplot(aes(x= JobSatisfaction, y = n, fill = EducationField, group = as.character(Attrition)))+
+  geom_col() +
+  geom_vline(mapping = aes(xintercept = mean, color = Attrition)) +
+  facet_wrap(vars(EducationField)) +
+  labs(title = "Human Resources have the lowest job Satisfaction",
+       x="",
+       y="") +
+  theme(panel.background = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        axis.ticks = element_blank(),
+        strip.text = element_text(face = "bold", color = "white"),
+        strip.background = element_rect(fill = "black"))
+```
+
+Once we started to factor in attrition we can clearly see that HR has the lowest job satisfaction by attrition rate. So to look into HR to improve job satisfaction might be of interest. However, another thing of interest is why are Marketing and Other more satisfied and left than those who stayed? And why Other by so much? Is it the personality of the people working there or did they just use work there for a short time to build their resume.
+
+
+## The conditional distribution of log job satisfaction given department on attrition grouped by overtime
+
+Now let us see if our old variable is of some us to better see what could possibly be done.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+employee_attrition %>%
+  select(Attrition, Education, EducationField, Department, JobRole, JobSatisfaction, OverTime) %>%
+  mutate(OverTime = ifelse(OverTime == 1, "OverTime", "No OverTime")) %>%
+  group_by(OverTime, Attrition, EducationField, JobSatisfaction) %>%
+  summarize(n = log(n())) %>%
+  mutate(total = sum(n)) %>%
+  mutate(average = (n*JobSatisfaction)) %>%
+  mutate(new= sum(average)) %>%
+  mutate(mean = new/total) %>%
+  mutate(Attrition= ifelse(Attrition == 1, "Yes", "No")) %>%
+  ggplot(aes(x= JobSatisfaction, y = n, fill = EducationField, group = as.character(Attrition)))+
+  geom_col() +
+  geom_vline(mapping = aes(xintercept = mean, color = Attrition)) +
+  facet_wrap(vars(EducationField, OverTime)) + 
+  labs(title = "Human Resources have the lowest job Satisfaction",
+       x="",
+       y="") +
+  theme(panel.background = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        axis.ticks = element_blank(),
+        strip.text = element_text(face = "bold", color = "white"),
+        strip.background = element_rect(fill = "black"))
+```
+
+Some interesting points are above to be made. We see that, not only, does HR have the lowest, but also the highest satisfaction rate for attrition while people were on overtime. However, despite that one bad review by an overtime working HR member who left, all department members ended up either having the same or higher job satisfactions rating while working overtime. With this interesting information we can ask new people to stay longer not only to get to learn to love their job but love the people working there too, this plus the extra money could be the reasoning for people having a higher job satisfaction and in-turn may decrease the chance of workers leaving which will save the company for time & money.
+
+
+# How does working/ not working overtime impact an employee's working experience?
+
+From the previous research results, employees without attrition, whether working overtime or not have a median job satisfaction at 3. However, attiring employees not working overtime are actually less satisfied with their job than those working overtime. This analysis is surprising because the EDA shows that more attiring workers worked overtime. This nuance is something interesting to examine: Why did these workers who didn't work overtime have a lower mean of job satisfaction than the workers who worked overtime? 
+
+## Comparing non-overtime working employees and monthly income by job level & involvement 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+employee_attrition %>%
+  filter(between(JobLevel, 1, 3), OverTime == 0) %>%
+  mutate(Attrition = ifelse(Attrition == 1, 'Yes', 'No'),
+         JobLevel = paste0('Job Level ', JobLevel)) %>%
+  ggplot(aes(x = as.character(JobInvolvement), y = MonthlyIncome, fill = as.character(Attrition))) +
+  geom_boxplot(outlier.color = NA) +
+  geom_jitter(size = 1, alpha = 0.05) + 
+  facet_wrap(~JobLevel) + 
+  theme() + 
+  labs(x = 'Job Involvement', y = 'Monthly Income ($)', fill = 'Attrition',
+  title = 'Job Levels 1-3 Employees Not Working Overtime', subtitle = 'Filtered out levels 4 & 5 for insufficient data',
+  caption = 'Figure 1: This boxplot shows the monthly income of job levels 1-3 non-overtime workers by their \njob involvement. It compares the monthly income of employees who stayed and left. We \nfiltered out job levels 4 and 5 employees because there are very few information to conclude on. ') +
+  scale_y_continuous(breaks = seq(0, 15000, 2500)) + 
+  scale_fill_manual(values = c("lightgreen", "tomato2")) + 
+  theme(strip.text = element_text(face = "bold", color = "white"),
+        strip.background = element_rect(fill = "black"),
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        legend.position = c(0.2, 0.6),
+        panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+        plot.caption = element_text(hjust = 0.5))
+```
+
+The boxplot above indicated an imbalance and unproportional difference in monthly income between attiring and non-attiring employees. Since this graph compares such difference across all job involvements and job levels 1, 2, and 3, we can see how all three job level employees with attrition and no overtime have a much lower median monthly income for every job involvement value. This is a prime example in job level 2: at every job involvement, the employees who are attiring have a noticeably lower median monthly salary than their non-attiring peers. In other words, of two non-overtime employees with the same job level and involvement, there is a high chance where the pay is significantly different. This means that attiring employees could feel unfair because they are being paid less than people in the same job level who are also not working overtime and with the same job involvement. The income disparity given the same job level and job involvement might possibly cause a lower job satisfaction. Similarly, for attiring overtime workers, their median monthly income was also lower than those who stayed. 
+
+## Comparing number of years from last promotion by job level, overtime, and attrition
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+employee_attrition %>%
+  group_by(Attrition, OverTime, JobLevel) %>%
+  summarize(mean = mean(YearsSinceLastPromotion)) %>%
+  mutate(OverTime = ifelse(OverTime == 1, 'Overtime', 'No Overtime'),
+         Attrition = ifelse(Attrition == 1, 'Yes', 'No')) %>%
+  ggplot(aes(x = as.character(JobLevel), y = mean, fill = as.character(Attrition))) + 
+  geom_col(position = 'dodge') + 
+  geom_label(aes(label = round(mean, 1)), position = position_dodge(width = 0.9), size = 3, show.legend = FALSE) +
+  facet_wrap(~OverTime) + 
+  labs(x = 'Job Level', y = 'Years Since Last Promotion (Mean)',
+       fill = 'Attrition', title = 'Higher Average Years Since Last Promotion in Attired Employees',
+       subtitle = 'This average is also higher in non-overtime workers', caption = 'Figure 2: This dodged bar chart compares the average number of years since last promotion \nbetween employees with the same job level. At the same time, it compares across attrition and overtime') + 
+  scale_fill_manual(values = c("lightgreen", "tomato2")) + 
+  theme(strip.text = element_text(face = "bold", color = "white"),
+        strip.background = element_rect(fill = "black"),
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        legend.position = c(0.1, 0.6),
+        panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+        plot.caption = element_text(hjust = 0.5))
+
+```
+
+Similar to Monthly Income, the bar chart reveals a contrast between employees who don't work overtime. On the left hand side, within the same job level, the difference in average years since last promotion is significant. This observation is most notable in the large disparity between attiring and non-attiring job level 4 and 5 employees (i.e. 4.6 vs. 12.5 and 4.6 vs. 10.5). This could mean that attiring employees feel unjust because their last promotion was longer ago than workers in the same job level who are also not working overtime. Additionally, it is obvious that employees who work overtime have a shorter average years since last promotion than non-overtime employees at all job levels. Thus, employees in the same job level who don't work overtime could feel underused, which can be directly correlated with their lower job satisfaction. Hence, this imbalance seems to be a big reason for attrition. 
+
+# What is the relationship between Age (Generation) and Attrition?
+
+Results from the EDA reveals that age is also strongly correlated with attrition. Instead of grouping by 43 different ages, we categorize employees into generations. A generation refers to all of the people born and living at about the same time, so since the dataset contains employees from ages 18-60, there are four generations: Generation Z, Millennials, Generation X, and Boomers. The groups correspond to ages: 7 to 22, 23 to 38, 39 to 54, and 55 to 73 respectively. From the EDA, we observe a large difference in attiring employees by generation. As a reference, of all employees, 58% are Millennials, 3% are Gen X, 4% are Gen Z, and 36% are Boomers and of all attiring employees, 62% are Millennials, 3% are Gen X, 11% are Gen Z, and 24% are Boomers. 
+
+## Visualizing generation population and its respective attrition
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+employee_attrition %>%
+  mutate(Generation = ifelse(Age >= 7 & Age <= 22, 'Generation Z',
+                      ifelse(Age >= 23 & Age <= 38, 'Millennials',
+                      ifelse(Age <= 39 & Age <= 54, 'Generation X','Boomers')))) %>%
+  group_by(Generation) %>%
+  add_count() %>%
+  group_by(Generation, Attrition, n) %>%
+  summarize(count = n()) %>%
+  mutate(Attrition = ifelse(Attrition == 1, 'Yes', 'No')) %>%
+  ggplot() +
+  geom_mosaic(aes(x = product(Attrition, Generation), weight = count, fill = Attrition)) +
+  scale_fill_manual(values = c("lightgreen", "tomato2")) +
+  labs(title = 'Most Attritions in Millennials, Most Probable in Generation Z',
+       caption = 'Figure 3: The mosaic plot represents the employee population by generation and their respective attrition \nweights. The weights are given by the number of employees in each generation, then the plot is color-filled by attrition.
+') + 
+  theme(legend.position = 'top',
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        plot.caption = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, vjust = 1.35, hjust = 1.1))
+
+```
+
+The mosaic plot shows that there is a higher probability for the younger-age group (specifically Gen Z and the Millennials) to attire than the older-aged group (specifically Gen X and Boomers). But why might this be the case? To investigate this question and validate our observation on age and attrition, let's transform Generation into another variable: 'AgeGroup' - Young and Old. The young age group contains Generation Z's and Millennials while the old age group contains Generation X's and Boomers. 
+
+## The difference in job roles by young and old age groups
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+employee_attrition %>%
+  mutate(Generation = ifelse(Age >= 7 & Age <= 38, 'Young', 'Old')) %>%
+  group_by(Generation, JobRole) %>%
+  summarize(count = n()) %>%
+  ggplot(aes(x = JobRole, y = count, fill = Generation)) +
+  geom_col(position = 'fill') + 
+  coord_flip() + 
+  scale_fill_manual(values = c('#735a4b', '#61af8e')) + 
+  scale_y_continuous(label = percent) + 
+  theme(legend.position = 'top',
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        plot.caption = element_text(hjust = 0.5),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5)) + 
+  labs(x = 'Job Role', y = 'Percent', title = 'Much More Research Directors & Managers in Gen X and Boomers',
+       subtitle = 'More sales representatives & research scientists in young age group', fill = 'Age Group',
+       caption = 'Figure 4: The percentage stacked bar chart captures the relative frequency, \nor marginal frequency, of the age group proportion in each job role')
+  
+```
+
+By age groups, there are significantly more of one job role in one than the other. For instance, there are far more research directors and managers in the old than the young age group. Because we know that managers and research directors have the oldest median age, highest monthly income and job level, it is intriguing to analyze the percent difference in monthly income and job level by the two age groups.
+
+## Comparing percent & dollar difference in job level and monthly income by age groups
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+p1 <- employee_attrition %>%
+  mutate(TotalMean = mean(MonthlyIncome)) %>%
+  mutate(Generation = ifelse(Age >= 7 & Age <= 38, 'Young', 'Old')) %>%
+  group_by(Generation, TotalMean) %>%
+  summarize(GenerationMean = mean(MonthlyIncome)) %>%
+  mutate(dollarDiff = (GenerationMean - TotalMean),
+         label = paste0('$', round(dollarDiff, 2))) %>%
+  ggplot(aes(x = Generation, y = dollarDiff, fill = Generation)) +
+  geom_col() +
+  geom_label(aes(label = label), show.legend = FALSE) + 
+  scale_fill_manual(values = c('#15607a', '#65e0ba')) +
+  theme(legend.position = 'top',
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        plot.caption = element_text(hjust = 0.5)) +
+  labs(x = 'Age Group', y = '$ Difference in Monthly Income', fill = 'Age Group', 
+       subtitle = 'Difference of ~$4500 in Monthly Income',
+       caption = 'Figure 5: Dollar Difference - relative to mean monthly income')
+
+p2 <- employee_attrition %>%
+  mutate(TotalMean = mean(JobLevel)) %>%
+  mutate(Generation = ifelse(Age >= 7 & Age <= 38, 'Young', 'Old')) %>%
+  group_by(Generation, TotalMean) %>%
+  summarize(GenerationMean = mean(JobLevel)) %>%
+  mutate(percentDiff = (GenerationMean - TotalMean) / TotalMean,
+         label = paste0((round(percentDiff * 100)), '%')) %>%
+  ggplot(aes(x = Generation, y = percentDiff, fill = Generation)) +
+  geom_col() +
+  geom_label(aes(label = label), show.legend = FALSE) + 
+  scale_fill_manual(values = c('#15607a', '#65e0ba')) +
+  scale_y_continuous(label = percent) +
+  theme(legend.position = 'top',
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5),
+        plot.caption = element_text(hjust = 0.5)) +
+  labs(x = 'Age Group', y = '% Difference in Job Level', fill = 'Age Group', 
+       subtitle = 'Percent Difference in Job Level > 50%',
+       caption = 'Figure 6: Percentage Difference - relative to mean job level')
+
+grid.arrange(p1, p2, ncol = 2, widths = c(30, 30))
+
+```
+
+Given such results, the difference in both monthly income and job level is significant between the young and old age groups. Therefore, it is reasonable to predict that the younger age generation have a higher probability of attiring possibly to look for better job opportunities with higher income or job authority in the company. While they are still young, Generation Z's and Millennials have the time and room to look for better job opportunities opposed to the older generations. While the younger generations attire to seek better compensations and benefits, more advancements, and more challenges, it is reasonable to predict that the older Generation X and Boomer employees who have worked for at least 30 years most likely attire due to retirement. Therefore, it is difficult to not correlate attrition with age. There is a significant increase in income and job level as age increases, which explains why the younger generation might want to leave their current job given enough experience but no apparent change in income or job level. 
+
+# Which populations have the highest risk of attrition?
+
+To pinpoint the populations with the highest risk for attrition can help companies identify who to and who not to hire. 
+
+## Marital Status vs. Attrition {.tabset}
+
+Of the attiring employees, a whopping 51% are single. This raises questions and concerns on whether marital status impacts attrition. By comparing the percent make-up of each marital status given Attrition can help us determine if there is a correlation. 
+
+### Segment Plot
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+employee_attrition %>%
+  group_by(Attrition) %>%
+  add_count() %>%
+  group_by(MaritalStatus, Attrition, n) %>%
+  summarize(count = n()) %>%
+  mutate(counter = case_when(MaritalStatus == 'Divorced' ~ 1,
+                             MaritalStatus == 'Married' ~ 2,
+                             MaritalStatus == 'Single' ~ 3),
+         Attrition = ifelse(Attrition == 1, 'Yes', 'No')) %>%
+  arrange(-counter) %>%
+  ggplot(aes(x = count, y = MaritalStatus, color = as.character(Attrition))) +
+  geom_segment(aes(y = MaritalStatus, yend = MaritalStatus, x = 0, xend = n), size = 2) +
+  geom_point(size = 3, color = 'black') + 
+  facet_wrap(~Attrition, scales = 'free') + 
+  scale_color_manual(values = c("#58fa58", "#fa5858")) + 
+  theme(strip.text = element_text(face = "bold", color = "white"),
+        strip.background = element_rect(fill = "black"),
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major.x = element_line(color = "grey90", size = 0.5),
+        legend.position = 'top',
+        panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+        plot.caption = element_text(hjust = 0.5)) +
+  labs(color = 'Attrition', x = 'Number of Employees', y = 'Marital Status', 
+       title = 'Far More of the Attiring Employees Are Single',
+       subtitle = 'More of the Non-Attiring Employees Are Married',
+       caption = 'Figure 7: This segment graph illustrates the number of employees by Marital Status & Attrition')
+
+```
+
+This segment graph is faceted by Attrition to help us clearly identity the number of employees in each group by marital status. The difference between the attiring and non-attiring single and married employees is very noticeable. For attiring employees, it is clear that half of them are single while only a third are married. On the other hand, for non-attiring employees, it is clear that half of them are married while a third are single. It seems that there a nuance in whether an employee stays or leaves given their marital status. To review this disproportionality more carefully, we looked at the percent difference in attrition by marital status. 
+
+### Difference Bar Chart
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+e1 <- employee_attrition %>%
+  group_by(Attrition) %>%
+  add_count() %>%
+  group_by(MaritalStatus, Attrition, n) %>%
+  summarize(count = n()) %>%
+  mutate(counter = case_when(MaritalStatus == 'Divorced' ~ 1,
+                             MaritalStatus == 'Married' ~ 2,
+                             MaritalStatus == 'Single' ~ 3),
+         Attrition = ifelse(Attrition == 1, 'Yes', 'No'),
+         percent = count / n) %>%
+  arrange(-counter) %>%
+  filter(Attrition == 'Yes')
+
+e2 <- employee_attrition %>%
+  group_by(Attrition) %>%
+  add_count() %>%
+  group_by(MaritalStatus, Attrition, n) %>%
+  summarize(count = n()) %>%
+  mutate(counter = case_when(MaritalStatus == 'Divorced' ~ 1,
+                             MaritalStatus == 'Married' ~ 2,
+                             MaritalStatus == 'Single' ~ 3),
+         Attrition = ifelse(Attrition == 1, 'Yes', 'No'),
+         percent = count / n) %>%
+  arrange(-counter) %>%
+  filter(Attrition == 'No')
+
+inner_join(e1, e2, by = 'counter') %>%
+  mutate(percentDiff = percent.x - percent.y,
+         label = paste0(round(100 * percentDiff, 0), '%')) %>%
+  ggplot(aes(x = percentDiff, y = MaritalStatus.x, fill = MaritalStatus.x)) +
+  geom_col() +
+  geom_label(aes(label = label), show.legend = FALSE) + 
+  scale_x_continuous(label = percent) +
+  guides(fill = guide_legend(reverse = TRUE)) +
+  theme(legend.position = 'top',
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        plot.caption = element_text(hjust = 0.5),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5)) + 
+  labs(x = 'Percent Difference in Attrition (Attrition - NonAttrition)',
+       y = 'Marital Status', fill = 'Marital Status', title = 'Single Employees Are The Most Attrition-Likely',
+       subtitle = 'Married employees are the most stable group', caption = 'Figure 8: The bar chart captures the percentage difference between \nattiring employees and non-attiring employees by marital status.')
+
+```
+
+This bar chart shows a percent difference in attrition. For example, 22% more single employees left the company while 12% more married employees stayed at the company. This graph reveals that there is a higher chance that a single employee leaves than stays, while the probability that married and divorced employees staying is higher than leaving. In other words, single employees are most riskiest of the three, while married employees seem to be the most stable of the group. This might be true because single employees are easier to hire, whereas married employees need the stability in life given that they have a partner. 
+
+## Years At Company vs. Attrition {.tabset}
+
+Besides the single population, by the other visualization in EDA 4, there is a very clear distinction between the group with employees that worked at the company for 0 to 3 years and every other three groups. Thus, we can use a line graph to examine the relationship between years at company and Attrition. 
+
+### Line Graph
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+employee_attrition %>%
+  group_by(YearsAtCompany) %>%
+  summarize(mean = mean(Attrition)) %>%
+  ggplot(aes(x = YearsAtCompany, y = mean)) + 
+  geom_line(color = 'tomato2', size = 1) +
+  scale_x_continuous(breaks = seq(0, 40, 5)) + 
+  theme(
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        plot.caption = element_text(hjust = 0.5),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5)) +
+  labs(x = '# of Years At Company', y = 'Mean Attrition',
+       title = '# of Years at Company on Attirition',
+       subtitle = 'Large areas under the curve on the two ends of plot', 
+       caption = 'Figure 9: Line graph with increasing total years at company on attrition average.')
+  
+
+```
+
+The line graph presents an interesting change in attrition rate as the number of years at the company increases. For employees who stayed at the company for less than 20 years, we see that the mean attrition slowly decreases as the number of years at company increases. On the other hand, we are not interested in the results for employees with over 20 years of experience in the company because the results are not too conclusive due to a lack of abundance of such workers in this dataset. Therefore, we looked closely into the employees with at most 20 years at the company to identity the relationship between the number of years at company and attrition. To understand this relationship better, we will represent this as an area graph.
+
+### Zoomed in Area Graph
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+employee_attrition %>% 
+  filter(YearsAtCompany <= 20) %>%
+  group_by(YearsAtCompany) %>%
+  summarize(mean = mean(Attrition)) %>%
+  ggplot(aes(x = YearsAtCompany, y = mean)) + 
+  geom_area() +
+  scale_x_continuous(breaks = seq(0, 20, 1)) + 
+  theme(
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        plot.caption = element_text(hjust = 0.5),
+        panel.grid.major.y = element_line(color = "grey90", size = 0.5)) +
+  labs(x = '# of Years At Company', y = 'Mean Attrition',
+       title = '# of Years at Company on Attirition (Zoomed In)',
+       subtitle = 'Continously decreasing area from year 0', 
+       caption = 'Figure 10: Area graph with a decreasing area under the curve as year at company increases')
+
+```
+
+From this area graph, the area under the curve gradually decreases as the number of years at company increases. This is highlighted specifically under first 10 years. The highest risk of attrition is in the first 3 years of working in the company followed by reduced levels at around 6 years, then 10 years. This result is not exactly surprising because the increase in total years experience at the company means the institutionalization of the person to the company's way of living, which explains why an employee might not want to leave compared to someone else who just started the job. 
+
+# Conclusion
+
+In this employee attrition analysis project, we identified some of the most important factors that contribute to high attrition rate within IBM. We focused on identifying why employees voluntarily leave, what might have prevented them from leaving, and how we can use data to predict attrition risks. In this process, we showed that some significant reasons can be monthly income, age, overtime, job level, marital status, the number of years since last promotion and worked at the company. The purpose of identifying these factors is so that a company can take the right measures to resolve and decrease attrition rates. Therefore, we made three observations from our results. Firstly, the effort-reward imbalance seems to be the main reason for attrition for this organization. In figures 1 and 2, we see that more employees attire when they commit to the job as much as their peers, but still sees income and benefit differences. In this case, paying the employees in the same job level, same job involvement, and same job role with almost equal monthly income is important to retain the workers. Secondly, by increasing the incentive and allowance to work overtime is also important regarding an employee's satisfaction with their job. By making sure that there is an effective overtime policy - that those working overtime are being paid more than those who are not is necessary will improve the team atmosphere and individual performance within the company. Lastly, we identified some of the most attrition-risky population such as the younger age group (Gen Z & Millennials), single employees, and employees who worked for less than 6 years in the company. Although it is natural for attrition and inherently impossible to prevent all attrition in these populations, it is important to satisfy their needs. Therefore, by offering additional compensations and benefits and providing them with opportunities to grow individually is crucial. By providing them with a positive working atmosphere where they feel fair and recognize potential for growth in working experience is directly correlated with the success of an organization.
+
+However, there are many questions that remain unanswered given this limited and synthetic nature of this dataset. Given that situations may differ and the limiting number of variables that correlate with attrition, companies need to collect more personal and professional data from employees to fully understand why their own employees might be leaving. The working environment/ culture differs by situation, so you can't generalize these findings to all companies. Thus, by collecting more information on the workplace itself might help further explain employee attrition. Also, companies need to investigate more closely at the approaches to retain their employees. By simply understanding why employees might leave is not sufficient to prevent and decrease attrition rate. For instance, if an employee is looking for better opportunities, or working under a negative environment, or pressure of working excessive hours, the question is how does the company address these issues to satisfy the needs of the majority?  
