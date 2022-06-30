@@ -1,13 +1,15 @@
-# CMU Statistical Graphics and Visualization
+# CMU 36-315: Statistical Graphics and Visualization
 
 As part of our final project, we built and used interactive statistical graphics & visualizations as part of student-driven research studies.
 
-- **Online URL:** 
+- **Online URL:** https://addice-jeremy.github.io/CMU-Statistical-Graphics-and-Visualization-/
 - **Team Members** 
   - Jeremy Li (jiabinl@andrew.cmu.edu)
   - Samuel De Lucia (sdelucia@andrew.cmu.edu)
 
 # Course & Project Overview:
+
+### Instructor: Raja Sooriamurthi
 
 Graphical displays of quantitative information take on many forms as they help us understand both data and models. This course will serve to introduce the student to the most common forms of graphical displays and their uses and misuses. Students will learn both how to create these displays and how to understand them. As time permits, the course will consider some more advanced graphical methods such as interactive graphics, computer-generated animations, maps, network graphics, etc. Each student will be required to engage in projects using graphical methods to understand data collected from a real scientific or engineering experiment.
 
